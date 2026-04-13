@@ -1,8 +1,13 @@
 {
-  "name": "scaffold-stellar-frontend",
+  "name": "prompt-hash-stellar",
   "type": "module",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
+  "description": "Soroban-based prompt licensing marketplace with XLM payments and wallet-verified unlocks.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Obiajulu-gif/Prompt-Hash-Stellar"
+  },
   "scripts": {
     "dev": "vite",
     "start": "vite",
@@ -10,7 +15,7 @@
     "test": "vitest run",
     "test:contract": "cargo test -p prompt-hash",
     "preview": "vite preview",
-    "lint": "",
+    "lint": "eslint .",
     "format": "prettier . --write",
     "prepare": "husky"
   },
@@ -72,5 +77,13 @@
       "prettier --write --ignore-unknown"
     ]
   },
+  "keywords": [
+    "stellar",
+    "soroban",
+    "xlm",
+    "creator-economy",
+    "ai-prompts",
+    "marketplace"
+  ],
   "packageManager": "yarn@4.9.2+sha512.1fc009bc09d13cfd0e19efa44cbfc2b9cf6ca61482725eb35bbc5e257e093ebf4130db6dfe15d604ff4b79efd8e1e8e99b25fa7d0a6197c9f9826358d4d65c3c"
 }

@@ -1,21 +1,29 @@
-# stellar/soroban/Rust output
+# Rust / Soroban
 target
 .soroban
 
-# project identity and alias files will be in .config/stellar
+# Stellar local config
 .config
 
-# test snapshot folders from sample contracts
+# Tests and snapshots
 test_snapshots
 
-# build output
+# Frontend build output
 dist
 dist-ssr
 
-# dependencies
-node_modules/
+# Server build output
+server/build
 
-# logs
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Package manager state
+.yarn/install-state.gz
+.pnp.*
+
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -24,22 +32,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# environment variables
+# Environment files
 .env
 .env.*
 !.env.example
 
-# easy way to create temporary local-only files and folders
+# Local-only files
 *.local.*
 
-# macOS-specific files
+# Editor / OS artifacts
 .DS_Store
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 
-# generated contract clients
+# Generated contract clients
 packages/*
-# if you have other workspace packages, add them here
 !packages/.gitkeep
-
-# generated contract client imports
-# src/contracts/*
 !src/contracts/util.ts
