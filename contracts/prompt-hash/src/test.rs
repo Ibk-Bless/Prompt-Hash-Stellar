@@ -246,3 +246,17 @@ fn test_inactive_prompt_cannot_be_bought() {
         other => panic!("unexpected inactive prompt result: {:?}", other),
     }
 }
+
+#[test]
+fn test_extend_ttl_endpoint_is_callable() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+
+    let creator = Address::generate(&env);
+    let prompt_id = create_prompt(&env, &client, &creator, "TTL Prompt", 10_000);
+
+    use crate::types::DataKey;
+    let result = client.try_extend_ttl(&DataKey::Prompt(prompt_id));
+    assert!(result.is_ok());
+}

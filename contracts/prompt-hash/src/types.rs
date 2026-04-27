@@ -115,4 +115,5 @@ pub trait PromptHashTrait {
     fn set_fee_percentage(env: Env, new_fee_percentage: u32) -> Result<(), Error>;
     fn set_fee_wallet(env: Env, new_fee_wallet: Address) -> Result<(), Error>;
     fn upgrade(env: Env, new_wasm_hash: BytesN<32>) -> Result<(), Error>;
+    fn extend_ttl(env: Env, key: DataKey) -> Result<(), Error>;
 }
