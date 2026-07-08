@@ -67,6 +67,7 @@ import { connectWallet } from "@/util/wallet";
 import { usePageMeta } from "@/lib/seo/usePageMeta";
 import { CreatorProfileSettings } from "@/components/profile/CreatorProfileSettings";
 import { TransactionHistory } from "@/components/profile/TransactionHistory";
+import { UserAvatar } from "@/components/UserAvatar";
 
 const promptImageFallback = "/images/codeguru.png";
 
@@ -78,7 +79,7 @@ const formatNetworkName = (value?: string) => {
 const shortHash = (value: string) =>
   value ? `${value.slice(0, 8)}...${value.slice(-8)}` : "Pending";
 
-// eslint-disable-next-line no-unused-vars
+ 
 type Handler<TArgs extends unknown[]> = (...args: TArgs) => void;
 
 function AlertBanner({
@@ -282,11 +283,8 @@ function WalletIdentityPanel({
         <div className="relative p-6 md:p-8">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_60%_60%_at_100%_0%,rgba(56,189,248,0.1),transparent)]" />
           <div className="relative flex flex-col gap-6 md:flex-row md:items-center">
-            {/* Wallet avatar with connected indicator */}
             <div className="relative shrink-0">
-              <div className="flex h-24 w-24 items-center justify-center rounded-2xl border border-cyan-200/20 bg-gradient-to-br from-cyan-200/15 to-sky-400/10 text-cyan-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
-                <Wallet className="h-11 w-11" />
-              </div>
+              <UserAvatar address={address} size={96} className="border border-cyan-200/20 bg-gradient-to-br from-cyan-200/15 to-sky-400/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]" />
               <div className="absolute -bottom-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#0d1117] bg-emerald-400">
                 <CheckCircle2 className="h-3 w-3 text-slate-950" />
               </div>

@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { motion } from "framer-motion";
 import {
   useQueries,
   useQuery,
   useQueryClient,
   useMutation,
 } from "@tanstack/react-query";
+import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   ChevronLeft,
   ChevronRight,
@@ -49,11 +51,25 @@ export interface FetchAllPromptsProps {
   searchQuery: string;
   sortBy: string;
   comparedIds?: string[];
-  onToggleCompare?: (prompt: PromptRecord) => void;
-  onSetCategory?: (category: string) => void;
-  onSetTag?: (tag: string) => void;
+  onToggleCompare?: (_prompt: PromptRecord) => void;
+  onSetCategory?: (_category: string) => void;
+  onSetTag?: (_tag: string) => void;
   onClearFilters?: () => void;
 }
+
+const gridVariants = {
+  hidden: {},
+  visible: {
+    transition: {
+      staggerChildren: 0.07,
+    },
+  },
+};
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" as const } },
+};
 
 const FetchAllPrompts = ({
   selectedCategory,
@@ -69,6 +85,7 @@ const FetchAllPrompts = ({
 }: FetchAllPromptsProps) => {
   const queryClient = useQueryClient();
   const { address } = useWallet();
+  const reducedMotion = useReducedMotion();
   const [selectedPrompt, setSelectedPrompt] = useState<PromptRecord | null>(
     null,
   );
@@ -309,21 +326,30 @@ const FetchAllPrompts = ({
         />
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">
+          <motion.div
+            className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3"
+            variants={reducedMotion ? undefined : gridVariants}
+            initial={reducedMotion ? undefined : "hidden"}
+            animate={reducedMotion ? undefined : "visible"}
+          >
             {currentPrompts.map((prompt) => (
-              <PromptCard
+              <motion.div
                 key={prompt.id.toString()}
-                prompt={prompt}
-                hasAccess={accessMap.get(prompt.id.toString()) ?? false}
-                openModal={handleOpenModal}
-                isSaved={savedPromptIds.has(prompt.id.toString())}
-                isSaving={savingPromptId === prompt.id.toString()}
-                onToggleSave={handleToggleSave}
-                isCompared={comparedIds.includes(prompt.id.toString())}
-                onToggleCompare={onToggleCompare}
-              />
+                variants={reducedMotion ? undefined : cardVariants}
+              >
+                <PromptCard
+                  prompt={prompt}
+                  hasAccess={accessMap.get(prompt.id.toString()) ?? false}
+                  openModal={handleOpenModal}
+                  isSaved={savedPromptIds.has(prompt.id.toString())}
+                  isSaving={savingPromptId === prompt.id.toString()}
+                  onToggleSave={handleToggleSave}
+                  isCompared={comparedIds.includes(prompt.id.toString())}
+                  onToggleCompare={onToggleCompare}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Infinite Scroll Trigger */}
           {ENABLE_INFINITE_SCROLL && currentPage < totalPages && (
