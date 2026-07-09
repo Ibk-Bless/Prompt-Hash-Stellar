@@ -9,6 +9,7 @@ import {
   RecordPreview,
   GetPreviewStats,
 } from "../controllers/controllers";
+import { GetPurchaseTransactions } from "../controllers/purchaseControllers";
 
 export const promptRouter = express.Router();
 
@@ -36,6 +37,9 @@ promptRouter.route("/").get(GetPrompts);
 
 promptRouter.get("/buyer/:walletAddress/owned", GetOwnedPrompts);
 promptRouter.get("/buyer/:walletAddress/saved", GetSavedPrompts);
+promptRouter.get("/buyer/:walletAddress/transactions", GetPurchaseTransactions);
+promptRouter.post("/buyer/save", SavePrompt);
+promptRouter.post("/buyer/unsave", UnsavePrompt);
 promptRouter.get("/creator/:walletAddress/drafts", GetDraftPrompts);
 
 // Preview analytics (#257)
