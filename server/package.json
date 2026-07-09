@@ -8,7 +8,8 @@
   "main": "server.js",
   "scripts": {
     "test": "jest --passWithNoTests",
-    "lint": "eslint .",
+    "test:api": "jest --passWithNoTests",
+    "lint": "tsc --noEmit",
     "format": "prettier --write .",
     "build": "tsc",
     "dev": "nodemon --watch src --exec ts-node src/server.ts",
@@ -41,6 +42,7 @@
     "express-async-handler": "^1.2.0",
     "mongoose": "^9.5.0",
     "nodemon": "^3.1.14",
+    "prompt-hash-stellar": "file:..",
     "redis": "^6.0.1",
     "typescript": "^6.0.3"
   },
