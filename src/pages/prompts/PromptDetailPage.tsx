@@ -1,10 +1,7 @@
-import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
-  Check,
-  Copy,
   History,
   Loader2,
   ShieldCheck,
@@ -19,8 +16,9 @@ import { Button } from "@/components/ui/button";
 import { browserStellarConfig } from "@/lib/stellar/browserConfig";
 import { getPrompt } from "@/lib/stellar/promptHashClient";
 import { formatPriceLabel } from "@/lib/stellar/format";
-import { copyToClipboard } from "@/lib/clipboard/secureClipboard";
 import { usePageMeta } from "@/lib/seo/usePageMeta";
+import { ShareButtons } from "@/components/prompts/ShareButtons";
+import { PromptRevisionHistory } from "@/components/analytics/PromptRevisionHistory";
 import { MarkdownContent } from "@/components/MarkdownContent";
 import { UserAvatar } from "@/components/UserAvatar";
 
@@ -34,7 +32,6 @@ function summarise(text: string, max = 160): string {
 export default function PromptDetailPage() {
   const { id = "" } = useParams();
   const isValidId = /^\d+$/.test(id);
-  const [copied, setCopied] = useState(false);
 
   const {
     data: prompt,
@@ -87,7 +84,6 @@ export default function PromptDetailPage() {
       window.setTimeout(() => setCopied(false), 1800);
     }
   };
-
   const notFound = !isValidId || isError || (!isLoading && !prompt);
 
   return (
@@ -225,33 +221,22 @@ export default function PromptDetailPage() {
                 )}
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row">
+              <div className="flex flex-col gap-4 border-t border-white/10 pt-5">
                 <Button
                   asChild
-                  className="h-10 flex-1 bg-cyan-200 text-slate-950 hover:bg-cyan-100"
+                  className="h-10 w-full bg-cyan-200 text-slate-950 hover:bg-cyan-100"
                 >
                   <Link to="/browse">
                     <ShoppingBag className="h-4 w-4" />
                     View in marketplace
                   </Link>
                 </Button>
-                <Button
-                  variant="ghost"
-                  onClick={handleCopyLink}
-                  className="h-10 flex-1 border border-white/10 text-slate-200 hover:bg-white/10"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="h-4 w-4 text-emerald-400" />
-                      Link copied
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="h-4 w-4" />
-                      Copy share link
-                    </>
-                  )}
-                </Button>
+                <div className="flex flex-col gap-2">
+                  <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                    Share this prompt
+                  </span>
+                  <ShareButtons title={prompt.title} summary={summary} />
+                </div>
               </div>
             </div>
           </article>
