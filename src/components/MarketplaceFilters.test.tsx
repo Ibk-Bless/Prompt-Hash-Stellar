@@ -10,6 +10,8 @@ const defaultProps = {
   setSelectedCategory: vi.fn(),
   selectedTag: "",
   setSelectedTag: vi.fn(),
+  searchQuery: "",
+  setSearchQuery: vi.fn(),
   priceRange: [0, 25] as [number, number],
   setPriceRange: vi.fn(),
   sortBy: "recent",
