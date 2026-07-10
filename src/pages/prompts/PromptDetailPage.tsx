@@ -34,6 +34,9 @@ function summarise(text: string, max = 160): string {
 export default function PromptDetailPage() {
   const { id = "" } = useParams();
   const isValidId = /^\d+$/.test(id);
+  const { address } = useWallet();
+  const [copied, setCopied] = useState(false);
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   const {
     data: prompt,
@@ -240,18 +243,43 @@ export default function PromptDetailPage() {
                     View in marketplace
                   </Link>
                 </Button>
-                <div className="flex flex-col gap-2">
-                  <span className="text-xs font-medium uppercase tracking-wider text-slate-500">
-                    Share this prompt
-                  </span>
-                  <ShareButtons title={prompt.title} summary={summary} />
-                </div>
+                <Button
+                  variant="ghost"
+                  onClick={handleCopyLink}
+                  className="h-10 flex-1 border border-white/10 text-slate-200 hover:bg-white/10"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 text-emerald-400" />
+                      Link copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" />
+                      Copy share link
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowReportDialog(true)}
+                  className="h-10 flex-1 border border-rose-400/20 text-rose-200 hover:bg-rose-400/10"
+                >
+                  <Flag className="h-4 w-4" />
+                  Report listing
+                </Button>
               </div>
             </div>
           </article>
         )}
       </main>
 
+      <ReportDialog
+        promptId={id}
+        isOpen={showReportDialog}
+        onClose={() => setShowReportDialog(false)}
+        userAddress={address}
+      />
       <Footer />
     </div>
   );

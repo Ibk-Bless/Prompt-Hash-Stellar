@@ -15,11 +15,11 @@ import {
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PromptCard } from "@/pages/browse/PromptCard";
 import { PromptModal } from "@/pages/browse/PromptModal";
 import { browserStellarConfig } from "@/lib/stellar/browserConfig";
 import { formatPriceLabel } from "@/lib/stellar/format";
-import { shortenAddress } from "@/lib/utils";
 import {
   getAllPrompts,
   type PromptRecord,
@@ -61,6 +61,12 @@ export default function SellerPage() {
     enabled: Boolean(sellerAddress),
   });
 
+  const profileQuery = useQuery({
+    queryKey: ["creator-profile", sellerAddress],
+    queryFn: () => getCreatorProfile(sellerAddress),
+    enabled: Boolean(sellerAddress),
+  });
+
   const sellerPrompts = useMemo(
     () =>
       (promptsQuery.data ?? []).filter(
@@ -84,6 +90,10 @@ export default function SellerPage() {
     () => buildCreatorReputation(sellerAddress, sellerPrompts),
     [sellerAddress, sellerPrompts],
   );
+
+  const profile = profileQuery.data ?? null;
+  const displayName = getCreatorDisplayName(sellerAddress, profile);
+  const fallbackName = shortenCreatorAddress(sellerAddress);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-emerald-500/30">
@@ -116,9 +126,40 @@ export default function SellerPage() {
                   : "Unknown seller"}
               </h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">
-                Browse active prompt licenses from this creator and review their
-                marketplace activity before unlocking a prompt.
+                {profile?.bio ||
+                  "Browse active prompt licenses from this creator and review their marketplace activity before unlocking a prompt."}
               </p>
+              {(profile?.websiteUrl ||
+                profile?.twitterHandle ||
+                profile?.metadataUri) && (
+                <div className="mt-5 flex flex-wrap gap-3">
+                  {profile.websiteUrl ? (
+                    <a
+                      href={profile.websiteUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 hover:border-emerald-300/40 hover:text-emerald-200"
+                    >
+                      Website <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  ) : null}
+                  {profile.twitterHandle ? (
+                    <a
+                      href={`https://x.com/${profile.twitterHandle.replace(/^@/, "")}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-sm text-slate-200 hover:border-emerald-300/40 hover:text-emerald-200"
+                    >
+                      {profile.twitterHandle}
+                    </a>
+                  ) : null}
+                  {profile.metadataUri ? (
+                    <span className="inline-flex items-center rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1.5 text-sm text-cyan-100">
+                      IPFS profile
+                    </span>
+                  ) : null}
+                </div>
+              )}
               {sellerAddress && (
                 <p className="mt-5 break-all rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 font-mono text-xs text-slate-300 sm:text-sm">
                   {sellerAddress}
@@ -178,7 +219,7 @@ export default function SellerPage() {
             Active catalog
           </p>
           <h2 className="mb-6 mt-2 text-2xl font-bold sm:text-3xl">
-            Prompts by this seller
+            Active prompts by {displayName}
           </h2>
           {promptsQuery.isLoading ? (
             <div className="grid grid-cols-1 gap-8 md:grid-cols-2 xl:grid-cols-3">

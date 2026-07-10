@@ -17,6 +17,14 @@ struct PromptSaleStatusUpdated {
 }
 
 #[contractevent]
+struct PromptAdminModerated {
+    #[topic]
+    pub prompt_id: u128,
+    pub admin: Address,
+    pub active: bool,
+}
+
+#[contractevent]
 struct PromptPriceUpdated {
     #[topic]
     pub prompt_id: u64,
@@ -128,6 +136,41 @@ struct DisputeResolved {
     pub refunded: bool,
 }
 
+#[contractevent]
+struct BundleCreated {
+    #[topic]
+    pub bundle_id: u128,
+    pub creator: Address,
+    pub price_stroops: i128,
+}
+
+#[contractevent]
+struct BundlePurchased {
+    #[topic]
+    pub bundle_id: u128,
+    pub buyer: Address,
+    pub creator: Address,
+    pub price_stroops: i128,
+}
+
+#[contractevent]
+struct AccessPassCreated {
+    #[topic]
+    pub pass_id: u128,
+    pub creator: Address,
+    pub duration_secs: u64,
+    pub price_stroops: i128,
+}
+
+#[contractevent]
+struct AccessPassPurchased {
+    #[topic]
+    pub pass_id: u128,
+    pub buyer: Address,
+    pub creator: Address,
+    pub expires_at: u64,
+}
+
 pub struct Events;
 
 impl Events {
@@ -151,7 +194,21 @@ impl Events {
         PromptSaleStatusUpdated { prompt_id, active }.publish(env);
     }
 
-    pub fn emit_prompt_price_updated(env: &Env, prompt_id: u64, price_stroops: i128) {
+    pub fn emit_prompt_admin_moderated(
+        env: &Env,
+        prompt_id: u128,
+        admin: Address,
+        active: bool,
+    ) {
+        PromptAdminModerated {
+            prompt_id,
+            admin,
+            active,
+        }
+        .publish(env);
+    }
+
+    pub fn emit_prompt_price_updated(env: &Env, prompt_id: u128, price_stroops: i128) {
         PromptPriceUpdated {
             prompt_id,
             price_stroops,
@@ -278,6 +335,68 @@ impl Events {
             prompt_id,
             buyer,
             refunded,
+        }
+        .publish(env);
+    }
+
+    pub fn emit_bundle_created(
+        env: &Env,
+        bundle_id: u128,
+        creator: Address,
+        price_stroops: i128,
+    ) {
+        BundleCreated {
+            bundle_id,
+            creator,
+            price_stroops,
+        }
+        .publish(env);
+    }
+
+    pub fn emit_bundle_purchased(
+        env: &Env,
+        bundle_id: u128,
+        buyer: Address,
+        creator: Address,
+        price_stroops: i128,
+    ) {
+        BundlePurchased {
+            bundle_id,
+            buyer,
+            creator,
+            price_stroops,
+        }
+        .publish(env);
+    }
+
+    pub fn emit_access_pass_created(
+        env: &Env,
+        pass_id: u128,
+        creator: Address,
+        duration_secs: u64,
+        price_stroops: i128,
+    ) {
+        AccessPassCreated {
+            pass_id,
+            creator,
+            duration_secs,
+            price_stroops,
+        }
+        .publish(env);
+    }
+
+    pub fn emit_access_pass_purchased(
+        env: &Env,
+        pass_id: u128,
+        buyer: Address,
+        creator: Address,
+        expires_at: u64,
+    ) {
+        AccessPassPurchased {
+            pass_id,
+            buyer,
+            creator,
+            expires_at,
         }
         .publish(env);
     }
