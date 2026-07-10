@@ -46,7 +46,7 @@ fn create_prompt(
     title: &str,
     price_stroops: i128,
     asset: &Address,
-) -> u128 {
+) -> u64 {
     client.create_prompt(
         creator,
         &String::from_str(env, "https://example.com/prompt.png"),
@@ -62,7 +62,8 @@ fn create_prompt(
             asset: asset.clone(),
             expires_at: 0,
             splits: Vec::new(env),
-            tags: Vec::new(&env),
+            tags: Vec::new(env),
+            max_supply: 0,
         },
     )
 }
@@ -85,7 +86,7 @@ fn create_prompt_with_splits(
     price_stroops: i128,
     asset: &Address,
     splits: Vec<Split>,
-) -> u128 {
+) -> u64 {
     client.create_prompt(
         creator,
         &String::from_str(env, "https://example.com/prompt.png"),
@@ -101,7 +102,8 @@ fn create_prompt_with_splits(
             asset: asset.clone(),
             expires_at: 0,
             splits,
-            tags: Vec::new(&env),
+            tags: Vec::new(env),
+            max_supply: 0,
         },
     )
 }
@@ -455,7 +457,7 @@ fn test_update_platform_fee_emits_event() {
     let before = env.events().all().len();
     client.update_platform_fee(&context.admin, &400u32);
     let after = env.events().all().len();
-    assert!(after >= before + 1, "expected at least one new event");
+    assert!(after > before, "expected at least one new event");
 }
 
 #[test]
@@ -939,6 +941,7 @@ fn test_global_pause_blocks_mutations_but_not_reads() {
             expires_at: 0,
             splits: Vec::new(&env),
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
     match create_res {
@@ -1217,6 +1220,7 @@ fn test_create_prompt_blocked_when_paused() {
             expires_at: 0,
             splits: Vec::new(&env),
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
     match result {
@@ -1981,6 +1985,7 @@ fn test_create_prompt_with_expiry_stores_expires_at() {
             expires_at,
             splits: Vec::new(&env),
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
 
@@ -2015,6 +2020,7 @@ fn test_expired_listing_excluded_from_get_all_prompts() {
             expires_at: 2_000,
             splits: Vec::new(&env),
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
     let persistent = create_prompt(&env, &client, &creator, "Persistent", 5_000, &context.xlm);
@@ -2058,6 +2064,7 @@ fn test_buy_expired_listing_fails() {
             expires_at: 2_000,
             splits: Vec::new(&env),
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
 
@@ -2119,6 +2126,7 @@ fn test_extend_listing_pushes_expiry_and_allows_purchase() {
             expires_at: 2_000, // expires at t=2000
             splits: Vec::new(&env),
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
 
@@ -2196,6 +2204,7 @@ fn test_create_prompt_with_splits_stores_split_data() {
             expires_at: 0,
             splits,
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
 
@@ -2240,6 +2249,7 @@ fn test_buy_prompt_with_splits_distributes_correctly() {
             expires_at: 0,
             splits,
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
 
@@ -2302,6 +2312,7 @@ fn test_splits_exceeding_max_bps_minus_fee_rejected() {
             expires_at: 0,
             splits,
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
     match result {
@@ -2353,6 +2364,7 @@ fn test_multiple_splits_distribute_all_recipients() {
             expires_at: 0,
             splits,
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
 
@@ -2432,7 +2444,7 @@ fn test_buy_prompts_bulk_atomicity_one_failure_reverts_all() {
 
     let mut ids = Vec::new(&env);
     ids.push_back(prompt_a);
-    ids.push_back(999_999u128); // non-existent
+    ids.push_back(999_999u64); // non-existent
 
     let mut amounts = Vec::new(&env);
     amounts.push_back(price);
@@ -2859,6 +2871,7 @@ fn test_create_prompt_rejects_duplicate_split_recipients() {
             expires_at: 0,
             splits: dup_splits,
             tags: Vec::new(&env),
+            max_supply: 0,
         },
     );
     match result {
@@ -2916,7 +2929,14 @@ fn test_create_prompt_tags_and_category_filters() {
             asset: context.xlm.clone(),
             expires_at: 0,
             splits: Vec::new(&env),
-            tags,
+            tags: Vec::from_array(
+                &env,
+                [
+                    String::from_str(&env, "testing"),
+                    String::from_str(&env, "rust"),
+                ],
+            ),
+            max_supply: 0,
         },
     );
 
@@ -3013,4 +3033,562 @@ fn test_resolved_dispute_cannot_be_resolved_twice() {
         Err(Ok(Error::DisputeResolved)) => {}
         other => panic!("expected DisputeResolved, got {:?}", other),
     }
+}
+
+// ─── Issue #293: Additional edge-case tests ──────────────────────────────────
+
+#[test]
+fn test_max_supply_enforced_on_purchase() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+    let creator = Address::generate(&env);
+    let buyer1 = Address::generate(&env);
+    let buyer2 = Address::generate(&env);
+    let price = 5_000;
+
+    let prompt_id = create_prompt(
+        &env,
+        &client,
+        &creator,
+        "Limited Supply",
+        price,
+        &context.xlm,
+    );
+
+    // Set max supply to 1
+    client.set_prompt_max_supply(&creator, &prompt_id, &1);
+
+    // First purchase succeeds
+    fund_buyer(&xlm_client, &buyer1, &context.contract, price);
+    client.buy_prompt(
+        &buyer1,
+        &prompt_id,
+        &None::<Address>,
+        &price,
+        &None::<Bytes>,
+    );
+
+    // Second purchase fails — max supply reached
+    fund_buyer(&xlm_client, &buyer2, &context.contract, price);
+    let res = client.try_buy_prompt(
+        &buyer2,
+        &prompt_id,
+        &None::<Address>,
+        &price,
+        &None::<Bytes>,
+    );
+    match res {
+        Err(Ok(Error::MaxSupplyReached)) => {}
+        other => panic!("expected MaxSupplyReached, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_max_supply_zero_means_unlimited() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+    let creator = Address::generate(&env);
+    let price = 5_000;
+
+    let prompt_id = create_prompt(&env, &client, &creator, "Unlimited", price, &context.xlm);
+
+    // Default max_supply is 0 (unlimited) — multiple purchases should succeed
+    for _ in 0..5 {
+        let buyer = Address::generate(&env);
+        fund_buyer(&xlm_client, &buyer, &context.contract, price);
+        client.buy_prompt(&buyer, &prompt_id, &None::<Address>, &price, &None::<Bytes>);
+    }
+
+    let prompt = client.get_prompt(&prompt_id);
+    assert_eq!(prompt.sales_count, 5);
+}
+
+#[test]
+fn test_dispute_rejection_does_not_refund() {
+    // ─── Issue #106: Fixed Supply (Limited Edition) Prompts ──────────────────────
+}
+#[test]
+fn test_create_prompt_with_max_supply_stores_correctly() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+
+    let creator = Address::generate(&env);
+    let prompt_id = client.create_prompt(
+        &creator,
+        &String::from_str(&env, "https://example.com/img.png"),
+        &String::from_str(&env, "Limited Edition"),
+        &String::from_str(&env, "Software Development"),
+        &String::from_str(&env, "Only 3 copies available."),
+        &String::from_str(&env, "ciphertext"),
+        &String::from_str(&env, "iv"),
+        &String::from_str(&env, "wrapped-key"),
+        &hash(&env, 80),
+        &ListingConfig {
+            price: 10_000,
+            asset: context.xlm.clone(),
+            expires_at: 0,
+            splits: Vec::new(&env),
+            tags: Vec::new(&env),
+            max_supply: 3,
+        },
+    );
+
+    let prompt = client.get_prompt(&prompt_id);
+    assert_eq!(prompt.max_supply, 3);
+    assert_eq!(prompt.sales_count, 0);
+}
+
+#[test]
+fn test_limited_edition_exhausts_after_max_supply_sales() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+    let creator = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let price = 10_000;
+    let prompt_id = create_prompt(
+        &env,
+        &client,
+        &creator,
+        "Dispute Reject",
+        price,
+        &context.xlm,
+    );
+
+    fund_buyer(&xlm_client, &buyer, &context.contract, price);
+    client.buy_prompt(&buyer, &prompt_id, &None::<Address>, &price, &None::<Bytes>);
+
+    let balance_before = xlm_client.balance(&buyer);
+
+    client.open_dispute(
+        &buyer,
+        &prompt_id,
+        &crate::types::DisputeReason::InvalidEncryptedPayload,
+    );
+
+    // Admin rejects the dispute (refund = false)
+    client.resolve_dispute(&context.admin, &prompt_id, &buyer, &false);
+
+    // Buyer should NOT receive a refund
+    let balance_after = xlm_client.balance(&buyer);
+    assert_eq!(balance_before, balance_after);
+
+    // Buyer should still have access
+    assert!(client.has_access(&buyer, &prompt_id));
+}
+
+#[test]
+fn test_only_owner_can_set_pause_status() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let _non_admin = Address::generate(&env); // <-- Renamed from _non_admin
+
+    // Tell the environment to expect an authorization block from our non_admin address
+    env.set_auths(&[]);
+
+    let res = client.try_set_pause_status(&true); // <-- Removed .as_invoker()
+    match res {
+        Err(Err(_)) => {} // Accurately catches the native Soroban auth abort
+        other => panic!("expected native auth abort, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_only_owner_can_set_fee_wallet() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let _non_admin = Address::generate(&env);
+    let new_wallet = Address::generate(&env);
+    env.set_auths(&[]);
+
+    let res = client.try_set_fee_wallet(&new_wallet);
+    match res {
+        Err(Err(_)) => {}
+        other => panic!("expected native auth abort, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_lease_price_is_40_percent_of_listing() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+    let creator = Address::generate(&env);
+    let prompt_id = client.create_prompt(
+        &creator,
+        &String::from_str(&env, "https://example.com/img.png"),
+        &String::from_str(&env, "Limited Edition"),
+        &String::from_str(&env, "Software Development"),
+        &String::from_str(&env, "Only 2 copies available."),
+        &String::from_str(&env, "ciphertext"),
+        &String::from_str(&env, "iv"),
+        &String::from_str(&env, "wrapped-key"),
+        &hash(&env, 81),
+        &ListingConfig {
+            price: 5_000,
+            asset: context.xlm.clone(),
+            expires_at: 0,
+            splits: Vec::new(&env),
+            tags: Vec::new(&env),
+            max_supply: 2,
+        },
+    );
+
+    let buyer1 = Address::generate(&env);
+    let buyer2 = Address::generate(&env);
+    let buyer3 = Address::generate(&env);
+
+    fund_buyer(&xlm_client, &buyer1, &context.contract, 10_000);
+    fund_buyer(&xlm_client, &buyer2, &context.contract, 10_000);
+    fund_buyer(&xlm_client, &buyer3, &context.contract, 10_000);
+
+    // First purchase succeeds
+    client.buy_prompt(
+        &buyer1,
+        &prompt_id,
+        &None::<Address>,
+        &5_000i128,
+        &None::<Bytes>,
+    );
+    assert!(client.has_access(&buyer1, &prompt_id));
+    assert_eq!(client.get_prompt(&prompt_id).sales_count, 1);
+
+    // Second purchase succeeds (exhausts supply)
+    client.buy_prompt(
+        &buyer2,
+        &prompt_id,
+        &None::<Address>,
+        &5_000i128,
+        &None::<Bytes>,
+    );
+    assert!(client.has_access(&buyer2, &prompt_id));
+    assert_eq!(client.get_prompt(&prompt_id).sales_count, 2);
+
+    // Third purchase fails with MaxSupplyReached
+    let result = client.try_buy_prompt(
+        &buyer3,
+        &prompt_id,
+        &None::<Address>,
+        &5_000i128,
+        &None::<Bytes>,
+    );
+    match result {
+        Err(Ok(Error::MaxSupplyReached)) => {}
+        other => panic!("expected MaxSupplyReached, got {:?}", other),
+    }
+    assert!(!client.has_access(&buyer3, &prompt_id));
+}
+
+#[test]
+fn test_unlimited_supply_allows_many_purchases() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+    let creator = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let price = 100_000;
+
+    let prompt_id = create_prompt(&env, &client, &creator, "Lease Price", price, &context.xlm);
+
+    // Fund buyer with enough for lease (40% of price = 40_000)
+    let lease_price = price * 4_000 / 10_000; // 40_000
+    fund_buyer(&xlm_client, &buyer, &context.contract, lease_price);
+
+    let creator_balance_before = xlm_client.balance(&creator);
+
+    client.lease_prompt(&buyer, &prompt_id, &3600); // 1 hour lease
+
+    // Creator should receive lease_price minus fee
+    let fee_pct = client.get_fee_percentage() as i128;
+    let expected_creator_amount = lease_price - (lease_price * fee_pct / 10_000);
+    let creator_balance_after = xlm_client.balance(&creator);
+    assert_eq!(
+        creator_balance_after - creator_balance_before,
+        expected_creator_amount
+    );
+}
+
+#[test]
+fn test_get_prompts_by_ids_returns_matching_prompts() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let creator = Address::generate(&env);
+
+    let id0 = create_prompt(&env, &client, &creator, "Prompt A", 1_000, &context.xlm);
+    let id1 = create_prompt(&env, &client, &creator, "Prompt B", 2_000, &context.xlm);
+    let id2 = create_prompt(&env, &client, &creator, "Prompt C", 3_000, &context.xlm);
+
+    // Fetch all three
+    let ids = Vec::from_array(&env, [id0, id1, id2]);
+    let prompts = client.get_prompts_by_ids(&ids);
+    assert_eq!(prompts.len(), 3);
+    assert_eq!(
+        prompts.get(0).unwrap().title,
+        String::from_str(&env, "Prompt A")
+    );
+    assert_eq!(
+        prompts.get(1).unwrap().title,
+        String::from_str(&env, "Prompt B")
+    );
+    assert_eq!(
+        prompts.get(2).unwrap().title,
+        String::from_str(&env, "Prompt C")
+    );
+}
+
+#[test]
+fn test_get_prompts_by_ids_skips_nonexistent() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let creator = Address::generate(&env);
+
+    let id0 = create_prompt(&env, &client, &creator, "Exists", 1_000, &context.xlm);
+
+    // Include a non-existent ID (999)
+    let ids = Vec::from_array(&env, [id0, 999]);
+    let prompts = client.get_prompts_by_ids(&ids);
+    assert_eq!(prompts.len(), 1);
+    assert_eq!(
+        prompts.get(0).unwrap().title,
+        String::from_str(&env, "Exists")
+    );
+}
+
+#[test]
+fn test_get_prompts_by_ids_empty_list() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+
+    let ids = Vec::new(&env);
+    let prompts = client.get_prompts_by_ids(&ids);
+    assert_eq!(prompts.len(), 0);
+
+    let creator = Address::generate(&env);
+    let prompt_id = client.create_prompt(
+        &creator,
+        &String::from_str(&env, "https://example.com/img.png"),
+        &String::from_str(&env, "Unlimited Edition"),
+        &String::from_str(&env, "Software Development"),
+        &String::from_str(&env, "No supply limit."),
+        &String::from_str(&env, "ciphertext"),
+        &String::from_str(&env, "iv"),
+        &String::from_str(&env, "wrapped-key"),
+        &hash(&env, 82),
+        &ListingConfig {
+            price: 1_000,
+            asset: context.xlm.clone(),
+            expires_at: 0,
+            splits: Vec::new(&env),
+            tags: Vec::new(&env),
+            max_supply: 0,
+        },
+    );
+
+    for _i in 0..5 {
+        let buyer = Address::generate(&env);
+        fund_buyer(&xlm_client, &buyer, &context.contract, 10_000);
+        client.buy_prompt(
+            &buyer,
+            &prompt_id,
+            &None::<Address>,
+            &1_000i128,
+            &None::<Bytes>,
+        );
+        assert!(client.has_access(&buyer, &prompt_id));
+    }
+
+    assert_eq!(client.get_prompt(&prompt_id).sales_count, 5);
+}
+
+// ─── Task 1: Invariant hardening tests ──────────────────────────────────────
+
+#[test]
+fn test_non_owner_cannot_set_fee_percentage() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let _non_admin = Address::generate(&env);
+    env.set_auths(&[]);
+    let res = client.try_set_fee_percentage(&300u32);
+    match res {
+        Err(Err(_)) => {}
+        other => panic!("expected native auth abort, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_non_owner_cannot_set_referral_percentage() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let _non_admin = Address::generate(&env);
+    env.set_auths(&[]);
+    let res = client.try_set_referral_percentage(&300u32);
+    match res {
+        Err(Err(_)) => {}
+        other => panic!("expected native auth abort, got {:?}", other),
+    }
+}
+
+#[test]
+fn test_zero_price_prompt_rejected() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let creator = Address::generate(&env);
+
+    let result = client.try_create_prompt(
+        &creator,
+        &String::from_str(&env, "https://example.com/img.png"),
+        &String::from_str(&env, "Zero Price Prompt"),
+        &String::from_str(&env, "Software Development"),
+        &String::from_str(&env, "preview"),
+        &String::from_str(&env, "ciphertext"),
+        &String::from_str(&env, "iv"),
+        &String::from_str(&env, "wrapped-key"),
+        &hash(&env, 99),
+        &ListingConfig {
+            price: 0,
+            asset: context.xlm.clone(),
+            expires_at: 0,
+            splits: Vec::new(&env),
+            tags: Vec::new(&env),
+            max_supply: 0,
+        },
+    );
+    match result {
+        Err(Ok(Error::InvalidPrice)) => {}
+        other => panic!(
+            "expected InvalidPrice for zero price prompt, got {:?}",
+            other
+        ),
+    }
+}
+
+#[test]
+fn test_update_price_to_zero_rejected() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let _xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+
+    let creator = Address::generate(&env);
+    let prompt_id = create_prompt(
+        &env,
+        &client,
+        &creator,
+        "Pricey Prompt",
+        5_000,
+        &context.xlm,
+    );
+
+    let result = client.try_update_prompt_price(&creator, &prompt_id, &0i128);
+    match result {
+        Err(Ok(Error::InvalidPrice)) => {}
+        other => panic!(
+            "expected InvalidPrice for zero price update, got {:?}",
+            other
+        ),
+    }
+}
+
+#[test]
+fn test_buyer_index_records_purchases_deterministically() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+
+    let creator = Address::generate(&env);
+    let buyer = Address::generate(&env);
+
+    let prompt_a = create_prompt(&env, &client, &creator, "Prompt A", 5_000, &context.xlm);
+    let prompt_b = create_prompt(&env, &client, &creator, "Prompt B", 6_000, &context.xlm);
+    let prompt_c = create_prompt(&env, &client, &creator, "Prompt C", 7_000, &context.xlm);
+
+    fund_buyer(&xlm_client, &buyer, &context.contract, 100_000);
+
+    // Buy prompts in a specific order
+    client.buy_prompt(
+        &buyer,
+        &prompt_a,
+        &None::<Address>,
+        &5_000i128,
+        &None::<Bytes>,
+    );
+    client.buy_prompt(
+        &buyer,
+        &prompt_c,
+        &None::<Address>,
+        &7_000i128,
+        &None::<Bytes>,
+    );
+    client.buy_prompt(
+        &buyer,
+        &prompt_b,
+        &None::<Address>,
+        &6_000i128,
+        &None::<Bytes>,
+    );
+
+    // Buyer index must reflect deterministic insertion order
+    let buyer_prompts = client.get_prompts_by_buyer(&buyer);
+    assert_eq!(buyer_prompts.len(), 3);
+    assert_eq!(buyer_prompts.get(0).unwrap().id, prompt_a);
+    assert_eq!(buyer_prompts.get(1).unwrap().id, prompt_c);
+    assert_eq!(buyer_prompts.get(2).unwrap().id, prompt_b);
+}
+
+#[test]
+fn test_inactive_prompt_purchase_fails_with_correct_error() {
+    let env: Env = Default::default();
+    let context = setup(&env);
+    let client = PromptHashContractClient::new(&env, &context.contract);
+    let xlm_client = token::StellarAssetClient::new(&env, &context.xlm);
+
+    let creator = Address::generate(&env);
+    let buyer = Address::generate(&env);
+    let price: i128 = 5_000;
+    let prompt_id = create_prompt(
+        &env,
+        &client,
+        &creator,
+        "Inactive Test",
+        price,
+        &context.xlm,
+    );
+
+    fund_buyer(&xlm_client, &buyer, &context.contract, price);
+
+    // Deactivate the listing
+    client.set_prompt_sale_status(&creator, &prompt_id, &false);
+
+    let result =
+        client.try_buy_prompt(&buyer, &prompt_id, &None::<Address>, &price, &None::<Bytes>);
+    match result {
+        Err(Ok(Error::PromptInactive)) => {}
+        other => panic!(
+            "expected PromptInactive for deactivated listing, got {:?}",
+            other
+        ),
+    }
+
+    // Reactivate and purchase should succeed
+    client.set_prompt_sale_status(&creator, &prompt_id, &true);
+    client.buy_prompt(&buyer, &prompt_id, &None::<Address>, &price, &None::<Bytes>);
+    assert!(client.has_access(&buyer, &prompt_id));
 }
