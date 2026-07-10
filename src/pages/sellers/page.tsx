@@ -5,11 +5,12 @@ import {
   ArrowLeft,
   BadgeCheck,
   BarChart3,
-  ExternalLink,
+  Clock,
   Loader2,
   PackageSearch,
   ShoppingBag,
   Sparkles,
+  ThumbsUp,
 } from "lucide-react";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
@@ -24,12 +25,11 @@ import {
   type PromptRecord,
 } from "@/lib/stellar/promptHashClient";
 import { invalidateAllPromptQueries } from "@/hooks/useContractSync";
+import { buildCreatorReputation } from "@/lib/reputation/creatorReputation";
 import {
-  getCreatorDisplayName,
-  getCreatorInitials,
-  getCreatorProfile,
-  shortenCreatorAddress,
-} from "@/lib/profiles/creatorProfile";
+  CreatorReputationSummary,
+  CreatorVerifiedBadge,
+} from "@/components/reputation/CreatorReputationBadge";
 
 const isMarketplaceConfigured = Boolean(
   browserStellarConfig.promptHashContractId &&
@@ -86,6 +86,10 @@ export default function SellerPage() {
     const categories = new Set(sellerPrompts.map((prompt) => prompt.category));
     return { totalSales, totalListedValue, categoryCount: categories.size };
   }, [sellerPrompts]);
+  const reputation = useMemo(
+    () => buildCreatorReputation(sellerAddress, sellerPrompts),
+    [sellerAddress, sellerPrompts],
+  );
 
   const profile = profileQuery.data ?? null;
   const displayName = getCreatorDisplayName(sellerAddress, profile);
@@ -113,22 +117,14 @@ export default function SellerPage() {
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.22em] text-emerald-200">
                 <Sparkles className="h-3.5 w-3.5" /> Seller profile
               </div>
-              <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                <Avatar className="h-24 w-24 border border-white/10 bg-slate-900 text-xl font-bold text-emerald-200">
-                  <AvatarImage src={profile?.avatarUrl} alt={displayName} />
-                  <AvatarFallback>
-                    {getCreatorInitials(sellerAddress, profile?.displayName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0">
-                  <h1 className="max-w-3xl text-3xl font-black tracking-tight text-white sm:text-5xl">
-                    {displayName || "Unknown seller"}
-                  </h1>
-                  <p className="mt-2 font-mono text-sm text-slate-400">
-                    {fallbackName}
-                  </p>
-                </div>
+              <div className="mb-4">
+                <CreatorVerifiedBadge reputation={reputation} />
               </div>
+              <h1 className="max-w-3xl text-3xl font-black tracking-tight text-white sm:text-5xl">
+                {sellerAddress
+                  ? shortenAddress(sellerAddress)
+                  : "Unknown seller"}
+              </h1>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400 sm:text-lg">
                 {profile?.bio ||
                   "Browse active prompt licenses from this creator and review their marketplace activity before unlocking a prompt."}
@@ -169,6 +165,9 @@ export default function SellerPage() {
                   {sellerAddress}
                 </p>
               )}
+              <div className="mt-5">
+                <CreatorReputationSummary reputation={reputation} />
+              </div>
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-1">
               <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
@@ -178,11 +177,25 @@ export default function SellerPage() {
               </div>
               <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
                 <BarChart3 className="mb-3 h-5 w-5 text-cyan-300" />
-                <p className="text-2xl font-black">{stats.totalSales}</p>
+                <p className="text-2xl font-black">{reputation.totalSales}</p>
                 <p className="text-sm text-slate-400">Marketplace sales</p>
               </div>
               <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-                <BadgeCheck className="mb-3 h-5 w-5 text-amber-300" />
+                <ThumbsUp className="mb-3 h-5 w-5 text-emerald-300" />
+                <p className="text-2xl font-black">{reputation.positiveRatings}</p>
+                <p className="text-sm text-slate-400">
+                  Positive ratings · {reputation.positiveRate}% positive
+                </p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+                <Clock className="mb-3 h-5 w-5 text-amber-300" />
+                <p className="text-2xl font-black">
+                  {reputation.timeOnPlatformLabel}
+                </p>
+                <p className="text-sm text-slate-400">Time on platform</p>
+              </div>
+              <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+                <BadgeCheck className="mb-3 h-5 w-5 text-purple-300" />
                 <p className="text-2xl font-black">
                   {formatPriceLabel(stats.totalListedValue)}
                 </p>

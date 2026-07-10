@@ -2,13 +2,15 @@ import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowLeft,
+  BadgeCheck,
   Check,
+  Clock,
   Copy,
-  Flag,
   Loader2,
   ShieldCheck,
   ShoppingBag,
   Sparkles,
+  ThumbsUp,
   User,
 } from "lucide-react";
 import { Navigation } from "@/components/navigation";
@@ -19,8 +21,8 @@ import { browserStellarConfig } from "@/lib/stellar/browserConfig";
 import { getPrompt } from "@/lib/stellar/promptHashClient";
 import { formatPriceLabel } from "@/lib/stellar/format";
 import { usePageMeta } from "@/lib/seo/usePageMeta";
-import { ReportDialog } from "@/components/prompts/ReportDialog";
-import { useWallet } from "@/hooks/useWallet";
+import { buildCreatorReputation } from "@/lib/reputation/creatorReputation";
+import { CreatorVerifiedBadge } from "@/components/reputation/CreatorReputationBadge";
 
 const FALLBACK_IMAGE = "/images/codeguru.png";
 
@@ -88,6 +90,9 @@ export default function PromptDetailPage() {
     }
   };
   const notFound = !isValidId || isError || (!isLoading && !prompt);
+  const reputation = prompt
+    ? buildCreatorReputation(prompt.creator, [prompt])
+    : null;
 
   return (
     <div className="min-h-screen bg-[#020617] text-white selection:bg-cyan-500/30">
@@ -155,31 +160,13 @@ export default function PromptDetailPage() {
                   <Sparkles className="mr-1 h-3 w-3" />
                   {prompt.category}
                 </Badge>
-                {prompt.active ? (
-                  <span
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                    title="This prompt is currently available for purchase"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    Active
-                  </span>
-                ) : (
-                  <span
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-500/10 text-slate-400 border border-slate-500/20"
-                    title="This prompt is not currently available for purchase"
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full bg-slate-400" />
-                    Inactive
-                  </span>
-                )}
-                {prompt.contentHash && (
-                  <span
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                    title="Content integrity verified on the Stellar blockchain"
-                  >
-                    <ShieldCheck className="h-3 w-3 text-amber-400" />
-                    Verified
-                  </span>
+                {reputation ? (
+                  <CreatorVerifiedBadge reputation={reputation} compact />
+                ) : null}
+                {!prompt.active && (
+                  <Badge className="border-white/10 bg-white/[0.04] text-slate-300">
+                    Unavailable
+                  </Badge>
                 )}
                 <span
                   className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20"
@@ -213,6 +200,28 @@ export default function PromptDetailPage() {
                       : prompt.creator}
                   </span>
                 </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <ShoppingBag className="h-3.5 w-3.5" />
+                  {prompt.salesCount} sold
+                </span>
+                {reputation ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5">
+                      <ThumbsUp className="h-3.5 w-3.5 text-emerald-300" />
+                      {reputation.positiveRatings} positive
+                    </span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <Clock className="h-3.5 w-3.5 text-cyan-300" />
+                      {reputation.timeOnPlatformLabel} on platform
+                    </span>
+                    {reputation.verified ? (
+                      <span className="inline-flex items-center gap-1.5 text-emerald-300">
+                        <BadgeCheck className="h-3.5 w-3.5" />
+                        {reputation.verificationLabel}
+                      </span>
+                    ) : null}
+                  </>
+                ) : null}
                 <span className="font-semibold text-white">
                   {formatPriceLabel(prompt.priceStroops)}
                 </span>

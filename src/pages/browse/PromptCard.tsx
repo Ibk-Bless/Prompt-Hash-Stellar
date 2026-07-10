@@ -19,10 +19,11 @@ import type { PromptRecord } from "@/lib/stellar/promptHashClient";
 import { StarRating } from "@/components/prompts/StarRating";
 import { useQuery } from "@tanstack/react-query";
 import { ReviewClient } from "@/lib/reviews/reviewClient";
+import { buildCreatorReputation } from "@/lib/reputation/creatorReputation";
 import {
-  getCreatorDisplayName,
-  getCreatorProfile,
-} from "@/lib/profiles/creatorProfile";
+  CreatorReputationSummary,
+  CreatorVerifiedBadge,
+} from "@/components/reputation/CreatorReputationBadge";
 
 export const PromptCard = ({
   prompt,
@@ -44,7 +45,7 @@ export const PromptCard = ({
   onToggleCompare?: (_prompt: PromptRecord) => void;
 }) => {
   const isBestSeller = prompt.salesCount >= 10;
-  const reducedMotion = useReducedMotion();
+  const reputation = buildCreatorReputation(prompt.creator, [prompt]);
 
   // Fetch review stats for this prompt
   const { data: reviewStats } = useQuery({
@@ -93,10 +94,28 @@ export const PromptCard = ({
             <Badge className="bg-slate-950/80 backdrop-blur-md border-white/10 text-slate-200 hover:bg-slate-900">
               {prompt.category}
             </Badge>
-            {isBestSeller && (
-              <Badge className="bg-emerald-500 text-slate-950 border-none font-bold">
-                <TrendingUp className="h-3 w-3 mr-1" /> Best Seller
-              </Badge>
+          )}
+          {reputation.verified && (
+            <Badge className="bg-cyan-300 text-slate-950 border-none font-bold">
+              <ShieldCheck className="h-3 w-3 mr-1" /> Verified Creator
+            </Badge>
+          )}
+        </div>
+        <div className="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-8 rounded-full border border-white/10 bg-slate-950/75 px-3 text-xs text-white shadow-lg backdrop-blur-md hover:bg-slate-900"
+            disabled={isSaving}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleSave(prompt);
+            }}
+          >
+            {isSaved ? (
+              <BookmarkCheck className="mr-1.5 h-3.5 w-3.5 text-emerald-300" />
+            ) : (
+              <Bookmark className="mr-1.5 h-3.5 w-3.5" />
             )}
           </div>
           <div className="absolute top-4 right-4 flex flex-col gap-2 items-end z-10">
@@ -223,47 +242,9 @@ export const PromptCard = ({
           </div>
         </div>
 
-            <p className="line-clamp-2 text-sm text-slate-400 leading-relaxed">
-              {prompt.previewText}
-            </p>
-
-            {/* Quality Score Display */}
-            <div className="pt-2">
-              {reviewStats && reviewStats.total > 0 ? (
-                <div className="flex items-center gap-2">
-                  <StarRating
-                    rating={reviewStats.averageRating}
-                    readonly
-                    size="sm"
-                    showCount
-                    reviewCount={reviewStats.total}
-                  />
-                  <span
-                    className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400"
-                    title="Average quality score based on buyer reviews"
-                  >
-                    {reviewStats.averageRating.toFixed(1)}
-                  </span>
-                </div>
-              ) : (
-                <span className="text-[11px] text-slate-500 italic">
-                  No ratings yet
-                </span>
-              )}
-            </div>
-            <Link
-              to={`/sellers/${encodeURIComponent(prompt.creator)}`}
-              className="truncate text-xs font-medium text-slate-400 transition-colors hover:text-emerald-300"
-              onClick={(event) => event.stopPropagation()}
-              aria-label={`View seller ${creatorName}`}
-              title={prompt.creator}
-            >
-              {creatorName}
-            </Link>
-          </div>
-
-          {/* Purchase Info Row */}
-          <div className="mt-5 flex items-center justify-between border-t border-white/5 pt-4 sm:mt-6 sm:pt-5">
+        {/* Purchase Info Row */}
+        <div className="mt-5 space-y-3 border-t border-white/5 pt-4 sm:mt-6 sm:pt-5">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <div className="h-6 w-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
                 <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
@@ -292,8 +273,12 @@ export const PromptCard = ({
               </div>
             )}
           </div>
-        </CardContent>
-      </Card>
-    </motion.div>
+          <div className="space-y-2">
+            <CreatorVerifiedBadge reputation={reputation} compact />
+            <CreatorReputationSummary reputation={reputation} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
