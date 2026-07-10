@@ -14,12 +14,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { shortenAddress } from "@/lib/utils";
 import { formatPriceLabel } from "@/lib/stellar/format";
 import type { PromptRecord } from "@/lib/stellar/promptHashClient";
 import { StarRating } from "@/components/prompts/StarRating";
 import { useQuery } from "@tanstack/react-query";
 import { ReviewClient } from "@/lib/reviews/reviewClient";
+import {
+  getCreatorDisplayName,
+  getCreatorProfile,
+} from "@/lib/profiles/creatorProfile";
 
 export const PromptCard = ({
   prompt,
@@ -50,13 +53,13 @@ export const PromptCard = ({
     staleTime: 60_000, // Cache for 1 minute
   });
 
-  const hoverProps = reducedMotion
-    ? {}
-    : {
-        whileHover: { y: -4, scale: 1.01 },
-        whileTap: { scale: 0.98 },
-        transition: { type: "spring" as const, stiffness: 300, damping: 20 },
-      };
+  const { data: creatorProfile } = useQuery({
+    queryKey: ["creator-profile", prompt.creator],
+    queryFn: () => getCreatorProfile(prompt.creator),
+    staleTime: 5 * 60_000,
+  });
+
+  const creatorName = getCreatorDisplayName(prompt.creator, creatorProfile);
 
   return (
     <motion.div {...hoverProps}>
@@ -212,7 +215,13 @@ export const PromptCard = ({
                   per license
                 </p>
               </div>
-            </div>
+            ) : (
+              <span className="text-[11px] text-slate-500 italic">
+                No ratings yet
+              </span>
+            )}
+          </div>
+        </div>
 
             <p className="line-clamp-2 text-sm text-slate-400 leading-relaxed">
               {prompt.previewText}
@@ -242,6 +251,15 @@ export const PromptCard = ({
                 </span>
               )}
             </div>
+            <Link
+              to={`/sellers/${encodeURIComponent(prompt.creator)}`}
+              className="truncate text-xs font-medium text-slate-400 transition-colors hover:text-emerald-300"
+              onClick={(event) => event.stopPropagation()}
+              aria-label={`View seller ${creatorName}`}
+              title={prompt.creator}
+            >
+              {creatorName}
+            </Link>
           </div>
 
           {/* Purchase Info Row */}
